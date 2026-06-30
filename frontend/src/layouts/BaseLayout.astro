@@ -1,0 +1,75 @@
+---
+// 全站统一布局 —— 生产级 SEO,集中在 <head>。
+export interface Props {
+  title: string;            // 页面完整标题 → <title>
+  description?: string;     // 页面摘要 → <meta name="description">
+  jsonLd?: Record<string, unknown> | Record<string, unknown>[]; // 结构化数据(可单个或多个)
+}
+
+const { title, description, jsonLd } = Astro.props;
+
+// canonical / og:url 用当前页 URL 自动推导(依赖 astro.config 的 site)
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
+const siteName = '明日方舟人物图鉴';
+// 统一成数组方便渲染多段 JSON-LD
+const jsonLdList = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
+---
+
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- ① 标题 + 描述 -->
+    <title>{title}</title>
+    {description && <meta name="description" content={description} />}
+
+    <!-- ② canonical 规范链接 -->
+    <link rel="canonical" href={canonical} />
+
+    <!-- ③ Open Graph(社交分享) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={siteName} />
+    <meta property="og:title" content={title} />
+    {description && <meta property="og:description" content={description} />}
+    <meta property="og:url" content={canonical} />
+    <meta property="og:locale" content="zh_CN" />
+
+    <!-- ④ Twitter Card -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content={title} />
+    {description && <meta name="twitter:description" content={description} />}
+
+    <!-- ⑤ JSON-LD 结构化数据 -->
+    {jsonLdList.map((obj) => (
+      <script type="application/ld+json" set:html={JSON.stringify(obj)} />
+    ))}
+
+    <link rel="stylesheet" href="/styles/global.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <nav class="container nav" aria-label="主导航">
+        <a class="brand" href="/">⬡ 罗德岛档案馆</a>
+        <ul class="nav-links">
+          <li><a href="/">关系图谱</a></li>
+          <li><a href="/characters/">人物名录</a></li>
+          <li><a href="/factions/">阵营</a></li>
+          <li><a href="/relations/">关系总览</a></li>
+          <li><a href="/seo-notes/">SEO 笔记</a></li>
+        </ul>
+      </nav>
+    </header>
+
+    <main class="container">
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <div class="container">
+        <p>本站为 SEO 学习用 Demo,人物与设定版权归《明日方舟》/ 鹰角网络所有。</p>
+      </div>
+    </footer>
+  </body>
+</html>

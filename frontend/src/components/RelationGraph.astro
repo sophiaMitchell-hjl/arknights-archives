@@ -1,0 +1,105 @@
+---
+import { characters, factions, relations, getFaction } from '@/data/characters';
+
+// 在构建期把数据整理成 ECharts 需要的结构,序列化进客户端脚本。
+// 注意:canvas 渲染的图对爬虫不可见,所以「真内容」放在下方 HTML 列表里,
+// 关系图只是渐进增强(progressive enhancement)——这是 SEO 的重要取舍。
+const categories = factions.map((f) => ({ name: f.name }));
+
+const nodes = characters.map((c) => {
+  const f = getFaction(c.faction);
+  return {
+    id: c.id,
+    name: c.name,
+    category: factions.findIndex((x) => x.id === c.faction),
+    symbolSize: 46,
+    itemStyle: { color: f?.color ?? '#888' },
+    value: c.role,
+  };
+});
+
+const links = relations.map((r) => ({
+  source: r.source,
+  target: r.target,
+  value: r.label,
+  label: { show: false, formatter: r.type },
+  lineStyle: { opacity: r.type === '对立' ? 0.9 : 0.5, width: r.type === '对立' ? 2.5 : 1.2,
+               color: r.type === '对立' ? '#e0533d' : '#9aa' },
+}));
+
+const graphData = JSON.stringify({ nodes, links, categories });
+const colors = JSON.stringify(factions.map((f) => f.color));
+---
+
+<figure class="graph-figure">
+  <div id="relation-graph" role="img"
+       aria-label="明日方舟主要人物关系力导向图,展示罗德岛、整合运动、企鹅物流、莱茵生命四个阵营之间的人物联系。">
+  </div>
+  <figcaption>力导向关系图 · 拖拽节点可调整布局,点击节点查看人物详情</figcaption>
+</figure>
+
+<!-- 数据通过 JSON 标签传给前端,脚本再读取。
+     不能用 <script define:vars> + import,因为那会变成内联脚本、不被打包,
+     裸模块名 echarts 无法在浏览器解析。 -->
+<script type="application/json" id="graph-data" set:html={graphData}></script>
+<script type="application/json" id="graph-colors" set:html={colors}></script>
+
+<script>
+  import * as echarts from 'echarts';
+
+  const data = JSON.parse(document.getElementById('graph-data')!.textContent!);
+  const palette = JSON.parse(document.getElementById('graph-colors')!.textContent!);
+  const el = document.getElementById('relation-graph');
+  if (el) {
+    const chart = echarts.init(el, null, { renderer: 'canvas' });
+    chart.setOption({
+      color: palette,
+      tooltip: {
+        formatter: (p) =>
+          p.dataType === 'edge'
+            ? `${p.data.source} — ${p.data.target}<br/>${p.data.value}`
+            : `<b>${p.data.name}</b><br/>${p.data.value}`,
+      },
+      legend: [{ data: data.categories.map((c) => c.name), top: 8 }],
+      series: [
+        {
+          type: 'graph',
+          layout: 'force',
+          roam: true,
+          draggable: true,
+          data: data.nodes,
+          links: data.links,
+          categories: data.categories,
+          label: { show: true, position: 'right', fontSize: 13 },
+          force: { repulsion: 320, edgeLength: 130, gravity: 0.08 },
+          lineStyle: { curveness: 0.06 },
+          emphasis: { focus: 'adjacency', lineStyle: { width: 3 } },
+        },
+      ],
+    });
+
+    // 点击节点 → 跳转到对应人物页(把交互图和可抓取页面连起来)
+    chart.on('click', (p) => {
+      if (p.dataType === 'node') window.location.href = `/characters/${p.data.id}/`;
+    });
+
+    window.addEventListener('resize', () => chart.resize());
+  }
+</script>
+
+<style>
+  .graph-figure { margin: 0 0 1rem; }
+  #relation-graph {
+    width: 100%;
+    height: 540px;
+    background: radial-gradient(circle at 50% 40%, #11161f, #0a0d13);
+    border: 1px solid #1f2733;
+    border-radius: 12px;
+  }
+  figcaption {
+    margin-top: 0.6rem;
+    color: var(--muted);
+    font-size: 0.85rem;
+    text-align: center;
+  }
+</style>

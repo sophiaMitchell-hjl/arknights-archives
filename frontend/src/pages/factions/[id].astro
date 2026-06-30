@@ -1,0 +1,76 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { factions, charactersByFaction, type Faction } from '@/data/characters';
+
+// 为每个阵营生成一个专题页 /factions/{id}/
+export function getStaticPaths() {
+  return factions.map((f) => ({ params: { id: f.id }, props: { faction: f } }));
+}
+
+interface Props { faction: Faction }
+const { faction } = Astro.props;
+const members = charactersByFaction(faction.id);
+
+const title = `${faction.name}有哪些人?成员一览与人物关系 | 明日方舟图鉴`;
+const description =
+  `《明日方舟》${faction.name}阵营成员一览,收录${members.map((m) => m.name).slice(0, 5).join('、')}` +
+  `${members.length > 5 ? '等' : ''}${members.length}位角色的简介、定位与人物关系。`;
+
+const canonical = new URL(`/factions/${faction.id}/`, Astro.site).href;
+
+// ItemList 结构化数据:把成员列成有序列表,利于搜索引擎理解「这是一个成员合集」
+const jsonLd = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: title,
+    description,
+    url: canonical,
+    mainEntity: {
+      '@type': 'ItemList',
+      itemListElement: members.map((m, i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        name: m.name,
+        url: new URL(`/characters/${m.id}/`, Astro.site).href,
+      })),
+    },
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: '首页', item: new URL('/', Astro.site).href },
+      { '@type': 'ListItem', position: 2, name: '阵营', item: new URL('/factions/', Astro.site).href },
+      { '@type': 'ListItem', position: 3, name: faction.name },
+    ],
+  },
+];
+---
+
+<BaseLayout title={title} description={description} jsonLd={jsonLd}>
+  <nav aria-label="面包屑" style="font-size:0.85rem;color:var(--muted);margin-bottom:1rem">
+    <a href="/">首页</a> / <a href="/factions/">阵营</a> / <span>{faction.name}</span>
+  </nav>
+
+  <h1>
+    <span class="badge" style={`background:${faction.color}`}>{faction.name}</span>
+    有哪些人?
+  </h1>
+  <p class="lead">
+    《明日方舟》{faction.name}阵营共收录 {members.length} 位角色。以下是成员一览,点击查看各自的人物档案与关系网络。
+  </p>
+
+  <h2>{faction.name}成员一览</h2>
+  <div class="grid">
+    {members.map((c) => (
+      <a class="card" href={`/characters/${c.id}/`}>
+        <h3>{c.name} <span class="codename">{c.codename}</span></h3>
+        <p class="summary">{c.role}</p>
+        <p class="summary">{c.summary}</p>
+      </a>
+    ))}
+  </div>
+
+  <p style="margin-top:2rem"><a href="/factions/">← 返回阵营总览</a></p>
+</BaseLayout>

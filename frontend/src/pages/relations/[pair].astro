@@ -1,0 +1,130 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import {
+  relations,
+  getCharacter,
+  getFaction,
+  relationSlug,
+  relationsInvolving,
+  type Relation,
+} from '@/data/characters';
+
+// 为 13 条关系各生成一个独立页面,URL = /relations/{source}-{target}/
+export function getStaticPaths() {
+  return relations.map((r) => ({
+    params: { pair: relationSlug(r) },
+    props: { relation: r },
+  }));
+}
+
+interface Props { relation: Relation }
+const { relation } = Astro.props;
+
+const a = getCharacter(relation.source)!;
+const b = getCharacter(relation.target)!;
+const fa = getFaction(a.faction);
+const fb = getFaction(b.faction);
+
+// 核心词复刻问句 +「关系类型」场景 + 品牌
+const title = `${a.name}和${b.name}是什么关系?${relation.type}关系解读 | 明日方舟图鉴`;
+// #2 Meta Description:答案前置,自然带上两个实体词与关系类型
+const description =
+  `${a.name}和${b.name}是什么关系?二人关系为「${relation.type}」——${relation.label}。` +
+  `点击查看${a.name}与${b.name}的人物档案及更多明日方舟人物关系。`;
+
+// 「更多关系」内链:两人各自的其它关系(排除当前这条),指向别的关系对页
+const more = [...relationsInvolving(a.id), ...relationsInvolving(b.id)]
+  .filter((r) => relationSlug(r) !== relationSlug(relation));
+// 去重
+const seen = new Set<string>();
+const moreUnique = more.filter((r) => {
+  const k = relationSlug(r);
+  if (seen.has(k)) return false;
+  seen.add(k);
+  return true;
+});
+
+const base = Astro.site;
+const jsonLd = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: [
+      {
+        '@type': 'Question',
+        name: `${a.name}和${b.name}是什么关系?`,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: `${a.name}与${b.name}的关系是「${relation.type}」——${relation.label}。`,
+        },
+      },
+    ],
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: '首页', item: new URL('/', base).href },
+      { '@type': 'ListItem', position: 2, name: '关系总览', item: new URL('/relations/', base).href },
+      { '@type': 'ListItem', position: 3, name: `${a.name} × ${b.name}` },
+    ],
+  },
+];
+---
+
+<BaseLayout title={title} description={description} jsonLd={jsonLd}>
+  <nav aria-label="面包屑" style="font-size:0.85rem;color:var(--muted);margin-bottom:1rem">
+    <a href="/">首页</a> / <a href="/relations/">关系总览</a> /
+    <span>{a.name} × {b.name}</span>
+  </nav>
+
+  {/* H1 复刻用户问句,命中「X和Y什么关系」长尾 */}
+  <h1>{a.name}和{b.name}是什么关系?</h1>
+
+  {/* 答案前置:第一段就把结论给出来 */}
+  <p class="lead">
+    {a.name}与{b.name}的关系是「<b>{relation.type}</b>」——{relation.label}。
+  </p>
+
+  {/* 两位角色卡片,链回各自百科页(三向内链之一) */}
+  <div class="grid" style="grid-template-columns:1fr 1fr;max-width:560px">
+    <a class="card" href={`/characters/${a.id}/`}>
+      <div class="avatar" role="img" aria-label={`${a.name}头像`} style={`background:${fa?.color};width:48px;height:48px;font-size:1.3rem;margin-bottom:.5rem`}>{a.name.slice(0, 1)}</div>
+      <h3>{a.name} <span class="codename">{a.codename}</span></h3>
+      <p class="summary">{a.role}</p>
+    </a>
+    <a class="card" href={`/characters/${b.id}/`}>
+      <div class="avatar" role="img" aria-label={`${b.name}头像`} style={`background:${fb?.color};width:48px;height:48px;font-size:1.3rem;margin-bottom:.5rem`}>{b.name.slice(0, 1)}</div>
+      <h3>{b.name} <span class="codename">{b.codename}</span></h3>
+      <p class="summary">{b.role}</p>
+    </a>
+  </div>
+
+  <h2>{a.name}和{b.name}的关系解读</h2>
+  <p>
+    {a.name}({a.role})与{b.name}({b.role})之间属于「{relation.type}」关系:{relation.label}。
+    想了解更多背景,可查看 <a href={`/characters/${a.id}/`}>{a.name}的人物档案</a>
+    与 <a href={`/characters/${b.id}/`}>{b.name}的人物档案</a>。
+  </p>
+
+  {moreUnique.length > 0 && (
+    <>
+      <h2>相关关系</h2>
+      <ul class="relation-list">
+        {moreUnique.map((r) => {
+          const x = getCharacter(r.source)!;
+          const y = getCharacter(r.target)!;
+          return (
+            <li>
+              <span class="rel-type">{r.type}</span>
+              <a href={`/relations/${relationSlug(r)}/`}><b>{x.name} × {y.name}</b></a>
+              <span style="color:var(--muted)">— {r.label}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  )}
+
+  <p style="margin-top:2rem"><a href="/relations/">← 返回关系总览</a></p>
+</BaseLayout>

@@ -1,0 +1,47 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { factions, charactersByFaction } from '@/data/characters';
+
+const title = '明日方舟势力阵营一览:罗德岛/整合运动/龙门等 | 明日方舟图鉴';
+const description =
+  '《明日方舟》主要势力阵营总览,包含罗德岛、整合运动、企鹅物流、莱茵生命、龙门、拉特兰、卡兹戴尔,点击查看各阵营成员与人物关系。';
+
+const canonical = new URL('/factions/', Astro.site).href;
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'CollectionPage',
+  name: title,
+  description,
+  url: canonical,
+  mainEntity: {
+    '@type': 'ItemList',
+    itemListElement: factions.map((f, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: f.name,
+      url: new URL(`/factions/${f.id}/`, Astro.site).href,
+    })),
+  },
+};
+---
+
+<BaseLayout title={title} description={description} jsonLd={jsonLd}>
+  <nav aria-label="面包屑" style="font-size:0.85rem;color:var(--muted);margin-bottom:1rem">
+    <a href="/">首页</a> / <span>阵营</span>
+  </nav>
+
+  <h1>明日方舟势力阵营一览</h1>
+  <p class="lead">{description}</p>
+
+  <div class="grid">
+    {factions.map((f) => {
+      const count = charactersByFaction(f.id).length;
+      return (
+        <a class="card" href={`/factions/${f.id}/`}>
+          <h3><span class="badge" style={`background:${f.color}`}>{f.name}</span></h3>
+          <p class="summary">收录 {count} 位角色 ›</p>
+        </a>
+      );
+    })}
+  </div>
+</BaseLayout>

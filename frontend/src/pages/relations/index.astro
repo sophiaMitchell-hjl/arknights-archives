@@ -1,0 +1,61 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { relations, getCharacter, relationSlug } from '@/data/characters';
+
+// 核心词「明日方舟人物关系」+ 收益「谁和谁什么关系一览」+ 品牌
+const title = '明日方舟人物关系总览:谁和谁是什么关系一览 | 明日方舟图鉴';
+const intro =
+  '明日方舟人物关系总览,按战友、上下级、对立、血缘等类型,梳理罗德岛与整合运动等阵营角色之间的关系,点击任意一对查看「他们是什么关系」的详细解读。';
+
+// 按关系类型分组,便于浏览,也强化「类型」这一聚合维度
+const byType = new Map<string, typeof relations>();
+for (const r of relations) {
+  const list = byType.get(r.type) ?? [];
+  list.push(r);
+  byType.set(r.type, list);
+}
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'CollectionPage',
+  name: title,
+  description: intro,
+  mainEntity: {
+    '@type': 'ItemList',
+    itemListElement: relations.map((r, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: `${getCharacter(r.source)!.name}和${getCharacter(r.target)!.name}是什么关系`,
+      url: new URL(`/relations/${relationSlug(r)}/`, Astro.site).href,
+    })),
+  },
+};
+---
+
+<BaseLayout title={title} description={intro} jsonLd={jsonLd}>
+  <nav aria-label="面包屑" style="font-size:0.85rem;color:var(--muted);margin-bottom:1rem">
+    <a href="/">首页</a> / <span>关系总览</span>
+  </nav>
+
+  <h1>人物关系总览</h1>
+  <p class="lead">{intro}</p>
+
+  {[...byType.entries()].map(([type, list]) => (
+    <section>
+      <h2>{type}</h2>
+      <ul class="relation-list">
+        {list.map((r) => {
+          const a = getCharacter(r.source)!;
+          const b = getCharacter(r.target)!;
+          return (
+            <li>
+              <span class="rel-type">{r.type}</span>
+              <a href={`/relations/${relationSlug(r)}/`}><b>{a.name}和{b.name}是什么关系</b></a>
+              <span style="color:var(--muted)">— {r.label}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  ))}
+</BaseLayout>

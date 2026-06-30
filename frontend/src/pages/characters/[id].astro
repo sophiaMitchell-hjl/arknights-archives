@@ -1,0 +1,122 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { characters, getCharacter, getFaction, relationsInvolving, relationSlug } from '@/data/characters';
+
+// getStaticPaths:构建期为每个角色生成一个独立页面。
+export function getStaticPaths() {
+  return characters.map((c) => ({ params: { id: c.id } }));
+}
+
+const { id } = Astro.params;
+const character = characters.find((c) => c.id === id)!;
+const faction = getFaction(character.faction);
+// 用 relationsInvolving 拿到原始 Relation(带 source/target),才能生成关系对页 slug
+const rels = relationsInvolving(character.id);
+const initial = character.name.slice(0, 1);
+
+// 核心词「{name}是谁」+ 阵营定位 + 收益「背景与关系」+ 品牌
+const title = `${character.name}是谁?${faction?.name ?? ''}人物背景与关系解读 | 明日方舟图鉴`;
+// #2 Meta Description:实体词 + 身份 + 关系,自然成句
+// 注意:role 已含阵营名(如「罗德岛医疗主管」),故不再额外拼「{阵营}的」,避免重复
+const description =
+  `${character.name}(${character.codename})是《明日方舟》中的${character.role}。` +
+  `${character.summary}本页解读${character.name}的身份背景、所属阵营与人物关系。`;
+
+// FAQ 取自已核实的关系数据(不编造),同时驱动页面问答与 FAQPage 结构化数据
+const faqItems = rels.map((r) => {
+  const otherId = r.source === character.id ? r.target : r.source;
+  const other = getCharacter(otherId)!;
+  return { q: `${character.name}和${other.name}是什么关系?`, a: `${r.type}——${r.label}。` };
+});
+
+const base = Astro.site;
+const jsonLd: Record<string, unknown>[] = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'Person',
+    name: character.name,
+    alternateName: character.codename,
+    jobTitle: character.role,
+    description: character.description,
+    memberOf: { '@type': 'Organization', name: faction?.name },
+    knows: rels.map((r) => {
+      const otherId = r.source === character.id ? r.target : r.source;
+      return { '@type': 'Person', name: getCharacter(otherId)!.name };
+    }),
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: '首页', item: new URL('/', base).href },
+      { '@type': 'ListItem', position: 2, name: '人物名录', item: new URL('/characters/', base).href },
+      { '@type': 'ListItem', position: 3, name: character.name },
+    ],
+  },
+];
+if (faqItems.length > 0) {
+  jsonLd.push({
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqItems.map((f) => ({
+      '@type': 'Question',
+      name: f.q,
+      acceptedAnswer: { '@type': 'Answer', text: f.a },
+    })),
+  });
+}
+---
+
+<BaseLayout title={title} description={description} jsonLd={jsonLd}>
+  <nav aria-label="面包屑" style="font-size:0.85rem;color:var(--muted);margin-bottom:1rem">
+    <a href="/">首页</a> / <a href="/characters/">人物名录</a> / <span>{character.name}</span>
+  </nav>
+
+  <div class="profile-head">
+    {/* #4 头像 alt:CSS 头像用 role+aria-label 提供等价替代文本 */}
+    <div class="avatar" role="img" aria-label={`${character.name}头像`}
+         style={`background:${faction?.color ?? '#888'}`}>{initial}</div>
+    <div>
+      <h1>{character.name} <span class="codename">{character.codename}</span></h1>
+      <p class="lead">
+        <span class="badge" style={`background:${faction?.color}`}>{faction?.name}</span>
+        &nbsp;{character.role}
+      </p>
+      <p style="color:var(--muted);font-size:0.9rem;margin:.2rem 0 0">种族:{character.race}</p>
+    </div>
+  </div>
+
+  {/* #3 H2 复刻「{name}是谁」长尾 + 答案前置 */}
+  <h2>{character.name}是谁?</h2>
+  <p>{character.description}</p>
+
+  {/* 背景经历:8 点结构的「背景原理」,基于 PRTS 事实原创撰写 */}
+  <h2>{character.name}的背景经历</h2>
+  <p>{character.background}</p>
+
+  {/* #3 H2 带实体词的关系小标题 */}
+  <h2>{character.name}的人物关系</h2>
+  {rels.length === 0 ? (
+    <p class="lead">暂无已收录的关系。</p>
+  ) : (
+    <ul class="relation-list">
+      {rels.map((r) => {
+        const otherId = r.source === character.id ? r.target : r.source;
+        const other = getCharacter(otherId)!;
+        return (
+          <li>
+            <span class="rel-type">{r.type}</span>
+            <a href={`/characters/${other.id}/`}><b>{other.name}</b></a>
+            <span style="color:var(--muted)">— {r.label}</span>
+            {/* #5 描述性锚文本:链到关系对页,锚文本就是目标长尾词 */}
+            <a href={`/relations/${relationSlug(r)}/`} style="margin-left:auto;font-size:0.82rem;white-space:nowrap">
+              {character.name}和{other.name}是什么关系 ›
+            </a>
+          </li>
+        );
+      })}
+    </ul>
+  )}
+
+  <p style="margin-top:2rem"><a href="/">← 返回明日方舟人物关系图</a></p>
+</BaseLayout>

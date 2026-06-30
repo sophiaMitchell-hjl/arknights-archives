@@ -1,0 +1,39 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { characters } from '@/data/characters';
+
+// 核心词「明日方舟人物」+ 收益「角色与干员一览」+ 品牌
+const title = '明日方舟人物名录:主要角色与干员关系一览 | 明日方舟图鉴';
+const intro =
+  '明日方舟主要人物与干员名录,收录阿米娅、凯尔希、博士、塔露拉、德克萨斯等角色的简介、所属阵营与人物关系,点击查看完整档案。';
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'CollectionPage',
+  name: title,
+  description: intro,
+  mainEntity: {
+    '@type': 'ItemList',
+    itemListElement: characters.map((c, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: c.name,
+      url: new URL(`/characters/${c.id}/`, Astro.site).href,
+    })),
+  },
+};
+---
+
+<BaseLayout title={title} description={intro} jsonLd={jsonLd}>
+  <h1>人物名录</h1>
+  <p class="lead">{intro}</p>
+
+  <div class="grid">
+    {characters.map((c) => (
+      <a class="card" href={`/characters/${c.id}/`}>
+        <h3>{c.name} <span class="codename">{c.codename}</span></h3>
+        <p class="summary">{c.role}</p>
+      </a>
+    ))}
+  </div>
+</BaseLayout>

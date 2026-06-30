@@ -1,0 +1,61 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import RelationGraph from '@/components/RelationGraph.astro';
+import { characters, factions } from '@/data/characters';
+
+// Title 公式:核心词「明日方舟人物关系图」+ 用户收益「一图看懂…关系网」
+const title = '明日方舟人物关系图:一图看懂罗德岛与整合运动角色关系网';
+// intro 同时用作页面可见正文(lead)与 <meta name="description">
+const intro =
+  '明日方舟人物关系图,交互式可视化罗德岛、整合运动、企鹅物流、莱茵生命等阵营的角色关系网络。点击节点查看人物档案,一图理清谁和谁是什么关系。';
+
+const base = Astro.site;
+const jsonLd = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: '明日方舟人物图鉴',
+    url: new URL('/', base).href,
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: title,
+    description: intro,
+    hasPart: characters.map((c) => ({
+      '@type': 'Person',
+      name: c.name,
+      url: new URL(`/characters/${c.id}/`, base).href,
+      jobTitle: c.role,
+    })),
+  },
+];
+---
+
+<BaseLayout title={title} description={intro} jsonLd={jsonLd}>
+  <h1>明日方舟人物关系图谱</h1>
+  <p class="lead">{intro}</p>
+
+  <RelationGraph />
+
+  <h2>人物名录(按阵营)</h2>
+  {factions.map((f) => {
+    const members = characters.filter((c) => c.faction === f.id);
+    if (members.length === 0) return null;
+    return (
+      <section>
+        <h3>
+          <span class="badge" style={`background:${f.color}`}>{f.name}</span>
+        </h3>
+        <div class="grid">
+          {members.map((c) => (
+            <a class="card" href={`/characters/${c.id}/`}>
+              <h3>{c.name} <span class="codename">{c.codename}</span></h3>
+              <p class="summary">{c.summary}</p>
+            </a>
+          ))}
+        </div>
+      </section>
+    );
+  })}
+</BaseLayout>
